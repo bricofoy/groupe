@@ -1,0 +1,138 @@
+
+
+
+
+FONCTIONNEMENT AUTOMATIQUE :
+
+    Activer le système  en tournant la clef sur "on". Rien ne se passe, c'est normal, le système est
+    en veille pour économiser la batterie.
+
+    Si il y a une demande de démarrage externe (commande par l'onduleur), le voyant blanc, puis le vert
+    s'allument, et le groupe démarre.
+
+    À la fin de la demande externe, le groupe s’arrête, le voyant blanc reste allumé en attente 2 minutes,
+    puis le système passe en veille pour économiser la batterie.
+
+    Si il y a un défaut enregistré, le voyant rouge est allumé et le système reste en attente 2h pour
+    signaler le défaut.
+
+
+
+
+DEMANDER LE DÉMARRAGE MANUELLEMENT :
+
+    Si le système est en veille, tourner la clef sur "start" (la diode blanche s'allume) et la maintenir
+    jusqu'à allumage des diodes vertes et rouges.
+    Relâcher la clef, la diode blanche reste allumée, le système est en attente.
+
+    Si on ne fait rien de plus, le système repasse en veille au bout de 2 minutes.
+
+    Si il y a un défaut enregistré, la diode rouge s'allume. Voir "SI IL Y A UN PROBLÈME".
+    
+
+    Pour demander le démarrage du groupe, tourner la clef sur "start" pendant 3s. Le voyant vert s'allume,
+    le groupe démarre.
+    Dès l'allumage du voyant vert, la demande est enregistrée, relâcher la clef.
+    
+    Pour arrêter le groupe après un démarrage manuel, tourner la clef sur "off". Penser le cas échéant
+    à la remettre ensuite sur "on" pour revenir au mode automatique.
+
+
+
+
+SI IL Y A UN PROBLÈME :
+
+    Le voyant rouge s'allume.
+
+    
+    Pour prendre connaissance de la nature du problème, appuyer sur le bouton noir "reset" pendant plus de
+    2 secondes.
+    
+	  -> les diodes affichent le défaut : 	Verte seule 	: temps de maintenance dépassé. (30h la
+								  première fois, puis 100h)
+									->Effectuer la maintenance puis
+									  remettre à zéro le compteur.
+									  Contacter le fournisseur.
+						Verte + Rouge 	: défaut de charge batterie lors du dernier
+								  fonctionnement.
+									->Vérifier fusible de charge.
+
+								  Ces deux défauts n'empêchent pas le
+								  fonctionnement normal du système.	
+
+						Si rien ne se passe après appui de 2 secondes, c'est que le
+						défaut est plus grave. Voir paragraphe suivant.
+
+
+
+
+
+
+
+
+
+
+
+						
+SI IL Y A UN PROBLÈME GRAVE :
+
+    Pour prendre connaissance d'un défaut grave, tourner la clef sur "start" pendant plus de 2 secondes
+    
+	  -> les diodes affichent le défaut : 	Verte 		: calage du moteur lors du dernier
+								  fonctionnement.
+									->Vérifier niveau gasoil. Vérifier le
+									  blocage du levier du régulateur.
+						Verte + Rouge 	: défaut de démarrage lors de la dernière
+								  tentative.
+									->Vérifier niveau gasoil. Vérifier le
+									  blocage du levier du régulateur.
+							Rouge 	: défaut de pression d'huile lors du dernier
+								  fonctionnement.
+									->Vérifier niveau huile moteur.
+						rien		: tension batterie groupe trop basse.
+									->Recharger la batterie ou démarrer
+									  le moteur manuellement.
+
+    Pour pouvoir relancer le moteur suite à un défaut grave, il faut effacer le défaut.
+    
+    Pour cela, tourner la clef sur "start" pendant plus de 2 secondes pour afficher le défaut, puis pendant
+    l'affichage du défaut, maintenir la clef sur "start" et appuyer simultanément sur "reset"  pendant 5
+    secondes.
+					->	Les diodes vertes et rouge s'éteignent, relâcher les boutons.
+						Le fonctionnement normal peut alors reprendre.
+
+						En cas de tension batterie trop basse et si on a pas rechargé
+						la batterie, le défaut réapparaît immédiatement.
+						Voir "DÉMARRAGE MANUEL".
+
+DÉMARRAGE MANUEL :
+    
+    Pour démarrer le moteur avec le lanceur manuel, il faut activer le mode manuel.
+
+    Pour cela, appuyer sur "reset", puis immédiatement tourner la clef sur "start".
+					->	La diode verte s'allume. Si la rouge était allumée, elle le
+						reste.
+
+						Il est alors possible de démarrer le moteur avec le lanceur
+						manuel.
+						Pour cela, respecter la procédure suivante :
+						    1 -tirer doucement le lanceur jusqu’à sentir un blocage
+							  (le piston est au début de la compression)
+						    2 -relâcher lentement le lanceur.
+						    3 -appuyer sur le levier de décompression. Le levier doit
+							tenir en position basse. Si il ne tient pas, reprendre
+							en 1.
+						    4 -tirer fermement le lanceur. Le moteur doit démarrer.
+							Sinon vérifier le niveau de gasoil et le blocage du
+							levier du régulateur, puis reprendre en 1.
+
+    Pour arrêter ensuite le moteur, tourner le clef sur "off".
+
+
+ARRÊT D'URGENCE DU MOTEUR :
+
+    En cas de défaillance de l’arrêt électrique ( si clef sur "off" le moteur tourne toujours), appuyer sur le
+    levier de déblocage du régulateur. Débrancher la batterie et contacter le fournisseur.
+
+      
+    
