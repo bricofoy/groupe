@@ -22,7 +22,9 @@
 		|			|	| suppression pin mesure ubat (même pin que alim, plus simple)
   25-10-2012	| bricofoy@free.fr	| 0.9	| ajustements pour correspondre au PCB 1.1
   26-10-2012	| bricofoy@free.fr	| 0.9.1 | ajout visu et reset défauts
-  
+  08-02-2013    | bricofoy@free.fr      | 0.9.9 | suppression erreur temps maintenance + plein d'autres trucs
+                |                       |       | ajout test si ve_alim avant vérifier ubat pour éviter fausse erreur
+                |			|	| VERSION QUI FONCTIONNE !!
   
   
   
@@ -107,16 +109,17 @@
 #define min_ubat_reset  12		//Tension au dessus de laquelle le défaut ubat disparait tout seul
 
 //temporisations, valeurs en ms
-#define tempo_attente		120E3	//2 minutes
+#define tempo_attente		20E3	//20 sec
 #define tempo_attente_defaut	7.2E6	//7,2*10^6ms = 2heures
 #define tempo_prechauffage	0.5E3	//1 secondes
 #define tempo_decomp		0.5E3	//0.5 s
-#define tempo_demarreur		6E3	//4 secondes
+#define tempo_demarreur		6E3	//6 secondes
 #define tempo_attente_calage	5E3	//5 secondes
 #define tempo_fin_calage	10E3	
 #define tempo_compteur		2E3
 #define tempo_manuel		18E5	//30 minutes
 #define tempo_valide_local	3E3
+#define tempo_valide_externe	5E3
 #define tempo_valide_reset	5E3
 #define tempo_montre_reset	2E3
 #define tempo_montre_defaut	2E3
@@ -196,15 +199,15 @@ void setup() {
 
 void lecture_entrees() { 
   // lecture des entrées, stockage dans une seule variable byte pour economiser de la ram et faciliter les manipulations
-float machin = 0;
+float externe = 0;
   
   ubat = coef_ubat * analogRead(e_alim_ubat);
-  machin = analogRead(e_ext);
+  externe = analogRead(e_ext);
   
   if (!force_entrees)
   {    
     entrees = ve_alim * (ubat > 5);		//si ubat>5 alors l'expression vaut TRUE, ou  1
-    if (machin > 10)
+    if (externe > 11)
       entrees += ve_ext ;
     entrees += ve_prh * !digitalRead(e_prh);	// prh et run sont en logique inversée sur la carte
     entrees += ve_run * !digitalRead(e_run);
@@ -482,6 +485,8 @@ void machine_etat() {
   switch (etat_machine) {
     case et_off:
 	    sorties = 0;
+            //if(entrees & ve_alim)
+            //  etat_machine = et_attente;
 	    break;
     case et_force:
 	    if (tempoMS(tempo_force))
@@ -514,8 +519,8 @@ void machine_etat() {
 
 	      if ((etat & vet_defchg)||(etat & vet_tmax))
 		sorties = vs_alim+vs_alarme;			//si défaut de charge mémorisé, alarme
-
-	      if (ubat < min_ubat)				//on passe en défaut si ubat trop faible
+ 
+	      if ((entrees & ve_alim)&&(ubat < min_ubat)) //on passe en défaut si ubat trop faible
 	      {
 		etat_machine = et_defaut;
 		tempoMS(0);
@@ -527,9 +532,9 @@ void machine_etat() {
 	      else if (etat & vet_defubat)
 		etat -= vet_defubat;
 
-	      if (tps >= tps_maintenance)
-		if (!(etat & vet_tmax))
-		  etat += vet_tmax;
+	      //if (tps >= tps_maintenance)
+		//if (!(etat & vet_tmax))
+		 // etat += vet_tmax;
 		
 
 	      if (tempoMS(tempo_attente))
@@ -546,9 +551,10 @@ void machine_etat() {
 		  
 
 
-	    if (etat&&(entrees & ve_rst)&&(!flag)) {
-	      if (!flag)
-		tempoMS(0);
+	    if (etat&&(entrees & ve_rst)&&(!flag)) 
+            {
+	      //if (!flag)
+	//	tempoMS(0);
 	       		//si reset appuyé pendant plus de tempo_montre_defaut, alors on affiche le défaut
 		flag = 1;
 	    }
@@ -566,24 +572,34 @@ void machine_etat() {
 
 
 	    
-// 	    if (entrees & ve_ext )
-// 	    {							//passe au préchauffage si demande départ externe
-// 	      etat_machine = et_prechauffe;
-// 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
-// 	      tempoMS2(0);
-// 	      break;
-// 	    }
 
 	    if (entrees & ve_ext )
 	    {
-					//passe au préchauffage si demande départ interne
+	      flagext = true;
+	      tempoMS(0);
+	      if (tempoMS2(tempo_valide_externe))
+	      {					//passe au préchauffage si demande départ externe
+		etat_machine = et_prechauffe;
+		flagext=0;
+		tempoMS(0);
+		tempoMS2(0);
+		break;
+	      }
+	    }
+	    else
+	      if (flagext)
+	      {
+		flagext = 0;
+		tempoMS2(0);
+	      }
+	     /* //passe au préchauffage si demande départ externe
 	      etat_machine = et_prechauffe;
 	      
 	      tempoMS(0);
 	      tempoMS2(0);
-	      
+	      break;
 	    }
-
+*/
 
 	    if (entrees & ve_loc )
 	    {
@@ -595,6 +611,8 @@ void machine_etat() {
 		local = true;
 		tempoMS(0);
 		tempoMS2(0);
+		flag2=0;
+                break;
 	      }
 	    }
 	    else
@@ -618,25 +636,26 @@ void machine_etat() {
 	    if (tempoMS(tempo_prechauffage))
 	      etat_machine = et_decomp;
 
-	    if (ubat < min_ubat)
+	    if ((entrees&ve_alim)&&(ubat < min_ubat))
 	    {
 	      etat_machine = et_defaut;
 	      if (!(etat & vet_defubat))
 		etat +=  vet_defubat;
 	    }
 	    
-// 	    if (!((entrees & ve_ext )||local)) {		//repasse en attente si fin demande départ externe
-// 	      etat_machine = et_attente;
-// 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
-// 	    }
+ 	    if (!((entrees & ve_ext )||local)) {		//repasse en attente si fin demande départ externe
+ 	      etat_machine = et_off;
+ 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
+ 	    }
 
 	    if (!(entrees & ve_alim))
-	    {
+	    {/*
 	      flagalim = 1;
 	      if (tempoMS2(tempo_coupe_alim))
-	      {
-		etat_machine = et_attente;			//repasse en attente si coupure alim
+	      {*/
+		etat_machine = et_off;			//repasse en attente si coupure alim
 		tempoMS(0);
+                tempoMS2(0);/*
 		flagalim = 0;
 	      }
 	    }
@@ -644,7 +663,7 @@ void machine_etat() {
 	      if (flagalim)
 	      {
 		tempoMS2(0);
-		flagalim = false;
+		flagalim = false;*/
 	      }
 	    
 	    break;
@@ -668,12 +687,14 @@ void machine_etat() {
 	      etat_machine = et_defaut;				//nombre max d'essais de démarrage dépassé -> défaut
 	      cpt_dem = 0;					//remise à 0 du compteur pour la prochaine fois
 	      tempoMS(0);
+              break;
 	    }
 	    
 	    if (tempoMS(tempo_decomp))
 	    {
 	      flag = false;
 	      etat_machine = et_demarreur;
+              break;
 	    }
 
 // 	    if (!((entrees & ve_ext )||local))
@@ -685,19 +706,20 @@ void machine_etat() {
 
 	    if (!(entrees & ve_alim))
 	    {
-	      flagalim = 1;
+	     /* flagalim = 1;
 	      if (tempoMS2(tempo_coupe_alim))
-	      {
-		etat_machine = et_attente;			//repasse en attente si coupure alim
+	      {*/
+		etat_machine = et_off;			//repasse en attente si coupure alim
 		tempoMS(0);
-	        flagalim = 0;
+                tempoMS2(0);
+	        /*flagalim = 0;
 	      }
 	    }
 	    else
 		if (flagalim)
 		{
 		  tempoMS2(0);
-		  flagalim = false;
+		  flagalim = false;*/
 		}
 	    
 
@@ -714,10 +736,14 @@ void machine_etat() {
 	    }
 		 
 	    if (entrees & ve_run)
+           // if (tempoMS2(500))
 	    {							//le moteur a démarré, passage à l'état suivant
 	      etat_machine = et_run;
 	      tempoMS(0);
+              tempoMS2(0);
+              break;
 	    }
+            //else tempoMS2(0);
 
 // 	    if (!((entrees & ve_ext )||local))
 // 	    {							//repasse en attente si fin demande départ externe
@@ -729,19 +755,19 @@ void machine_etat() {
 	    
 	    if (!(entrees & ve_alim))
 	    {
-	      flagalim = 1;
-	      if (tempoMS2(tempo_coupe_alim))
-	      {
-		etat_machine = et_attente;			//repasse en attente si coupure alim
+	      //flagalim = 1;
+	      //if (tempoMS2(tempo_coupe_alim))
+	      //{
+		etat_machine = et_off;			//repasse en attente si coupure alim
 		tempoMS(0);
-		flagalim = 0;
+		/*flagalim = 0;
 	      }
 	    }
 	    else
 	      if (flagalim)
 	      {
 		tempoMS2(0);
-		flagalim = false;
+		flagalim = false;*/
 	      }
 
 
@@ -753,7 +779,7 @@ void machine_etat() {
 	    if (tempoMS(tempo_pause_dem))
 	      etat_machine = et_decomp;
 
-	    if (ubat < min_ubat) {
+	    if ((entrees & ve_alim)&&(ubat < min_ubat)) {
 	      tempoMS(0);
 	      etat_machine = et_defaut;
 	      if (!(etat & vet_defubat))
@@ -767,19 +793,21 @@ void machine_etat() {
 
 	    if (!(entrees & ve_alim))
 	    {
+  /*
 	      flagalim = 1;
 	      if (tempoMS2(tempo_coupe_alim))
-	      {
-		etat_machine = et_attente;			//repasse en attente si coupure alim
+	      {*/
+		etat_machine = et_off;			//repasse en attente si coupure alim
 		tempoMS(0);
-		flagalim = 0;
+                tempoMS2(0);
+		/* flagalim = 0;
 	      }
 	    }
 	    else
 	      if (flagalim)
 	      {
 		tempoMS2(0);
-		flagalim = false;
+		flagalim = false; */
 	      }
 	      	    
 	    break;
@@ -798,11 +826,13 @@ void machine_etat() {
 	      etat_machine = et_run;
 	      local = 1;
 	      tempoMS(0);
+              tempoMS2(0);
 	    }
 
 	    if (!(entrees & ve_alim )) {			//repasse en attente si coupure alim
-	      etat_machine = et_attente;
+	      etat_machine = et_off;
 	      tempoMS(0);
+              tempoMS2(0);
 	      manuel = false;
 	    }
 	    break;
@@ -811,13 +841,13 @@ void machine_etat() {
     case et_run:  //********************************************************************************************************************************************
 	    sorties = vs_alim+vs_ok+vs_ev;
 
-	    if (!(flag||flag2)) //si on est en mode raz compteur temps, on zappe tout ce merdier
+	    if (true)  //(!(flag||flag2)) //si on est en mode raz compteur temps, on zappe tout ce merdier
 	    {
-	      if ((tps >= tps_maintenance)&&tpsm)		//en cas de dépassement délai maintenance, allumage alarme + ok
-		sorties = vs_alim+vs_ok+vs_ev+vs_alarme;
+	      //if ((tps >= tps_maintenance)&&tpsm)		//en cas de dépassement délai maintenance, allumage alarme + ok
+		//sorties = vs_alim+vs_ok+vs_ev+vs_alarme;
 
 
-	      if (ubat < min_chg)
+	      if ((entrees&ve_alim)&&(ubat < min_chg))
 	      {							//si la batterie ne charge pas, allumage alarme seule
 		sorties = vs_alim+vs_ev+vs_alarme;
 		if (!(etat & vet_defchg))
@@ -858,70 +888,72 @@ void machine_etat() {
 		      etat += vet_defcal;
 		    manuel = false;
 		    flagrun=false;
+                    tempoMS(0);
+                    tempoMS2(0);
 		    break;
 		  }
 		  else
-		    Serial.println("tempo : manuel");
+                  {
+		    Serial.println("tempo : auto");
 		    etat_machine = et_calage;			//passage à l'état et_calage
 		    tempoMS(0);
 		    tempoMS2(0);
 		    flagrun = false;
 		    break;
-	      }
+                  }
+               }   
 	      else
 		if (flagrun)
 		{
 		  tempoMS2(0);
 		  flagrun = false;
+                  Serial.println("sortie detect calage");
 		}
 		
 
 
 	      if (!((entrees & ve_ext )||local))
 	      {
-		flagext = 1;
+		/*flagext = 1;
 		if (tempoMS2(tempo_detection_calage))
-		{
-		  etat_machine = et_attente;			//repasse en attente si fin de demande départ externe
+		{*/
+		  etat_machine = et_off;			//repasse en attente si fin de demande départ externe
 		  tempoMS(0);
+		  tempoMS2(0);
 		  flagext = 0;
-		}
+		  break;
+		//}
 	      }
-	      else
+	      /*else
 		if (flagext)
 		{
 		  tempoMS2(0);
 		  flagext = false;
 		}
-
-
-
-	      
-
-	    
-	      
+	      */
 	      if (!(entrees & ve_alim))
 	      {
-		flagalim = 1;
+		/*flagalim = 1;
 		if (tempoMS2(tempo_coupe_alim))
-		{
-		  etat_machine = et_attente;			//repasse en attente si coupure alim
+		{*/
+		  etat_machine = et_off;			//repasse en attente si coupure alim
 		  tempoMS(0);
+                  tempoMS2(0);
 		  local = false;
 		  flag = false;					//repasse en attente si coupure alim
 		  flagalim = 0;
-		  break;
-		}
-	      }
+		  break; 
+		//}
+	      }/*
 	      else
 		if (flagalim)
 		{
 		  tempoMS2(0);
 		  flagalim = false;
-		}
+		}*/
 
 	    }
-
+	  
 	    
 	    if (entrees & ve_prh)
 	    {
@@ -933,11 +965,13 @@ void machine_etat() {
 	      flagrun=false;
 	      flag2 = false;
 	      local = false;
+              tempoMS2(0);
+              tempoMS(0);
 	      break;
 	    }
 
 
-	    //effacement du compteur de maintenance
+	   /* //effacement du compteur de maintenance
 	    if (entrees & ve_loc)
 	    {							//flag sert à vérifier qu'on a pas ve_loc qui lâche puis revient avant la fin de
 	      flag = true;					//tempo_valide_reset. si c'est le cas ça reset la tempo.
@@ -972,6 +1006,7 @@ void machine_etat() {
 	      }
 	      
 	    }
+              */
 
   
 	    break;
@@ -994,12 +1029,12 @@ void machine_etat() {
 	    
     case et_defaut: //*************************************************************************************************************************
 	    sorties = vs_alim+vs_alarme;			//TODO sauver temps apparition défaut et si apparu durant run ou non
-								//TODO copier le principe utiliser dans et_run pour la RAZ défaut : raz tempo si
+								//TODO copier le principe utilisé dans et_run pour la RAZ défaut : raz tempo si
 								//la demande lâche avant validation
 	    if(!flag)
 	    {
 	      if(etat == vet_ok )
-	      {				//en cas d'entrée en défaut par erreur
+	      {							//en cas d'entrée en défaut par erreur
 		etat_machine = et_attente;
 		break;
 	      }
@@ -1020,8 +1055,8 @@ void machine_etat() {
 		  etat_machine = et_attente;
 		}
 
-		if ((entrees & ve_rst)&&(entrees & ve_loc))	//passage mode manuel seulement si défaut Vbat uniquement
-		  if (etat == vet_defubat)
+	      if ((entrees & ve_rst)&&(entrees & ve_loc))	//passage mode manuel seulement si défaut Vbat uniquement
+		if (etat == vet_defubat)
 		  {
 		    etat_machine = et_manuel;
 		    tempoMS(0);

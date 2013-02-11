@@ -8,9 +8,9 @@ FONCTIONNEMENT AUTOMATIQUE :
     en veille pour économiser la batterie.
 
     Si il y a une demande de démarrage externe (commande par l'onduleur), le voyant blanc, puis le vert
-    s'allument, et le groupe démarre.
+    s'allument, et le groupe démarre au bout de 5 secondes d'attente.
 
-    À la fin de la demande externe, le groupe s’arrête, le voyant blanc reste allumé en attente 2 minutes,
+    À la fin de la demande externe, le groupe s’arrête, le voyant blanc reste allumé en attente 20 secondes,
     puis le système passe en veille pour économiser la batterie.
 
     Si il y a un défaut enregistré, le voyant rouge est allumé et le système reste en attente 2h pour
@@ -32,7 +32,7 @@ DEMANDER LE DÉMARRAGE MANUELLEMENT :
 
     Pour demander le démarrage du groupe, tourner la clef sur "start" pendant 3s. Le voyant vert s'allume,
     le groupe démarre.
-    Dès l'allumage du voyant vert, la demande est enregistrée, relâcher la clef.
+    Dès l'allumage du voyant vert, la demande est enregistrée, on peux relâcher la clef.
     
     Pour arrêter le groupe après un démarrage manuel, tourner la clef sur "off". Penser le cas échéant
     à la remettre ensuite sur "on" pour revenir au mode automatique.
@@ -48,12 +48,7 @@ SI IL Y A UN PROBLÈME :
     Pour prendre connaissance de la nature du problème, appuyer sur le bouton noir "reset" pendant plus de
     2 secondes.
     
-	  -> les diodes affichent le défaut : 	Verte seule 	: temps de maintenance dépassé. (30h la
-								  première fois, puis 100h)
-									->Effectuer la maintenance puis
-									  remettre à zéro le compteur.
-									  Contacter le fournisseur.
-						Verte + Rouge 	: défaut de charge batterie lors du dernier
+	  -> les diodes affichent le défaut : 	Verte + Rouge 	: défaut de charge batterie lors du dernier
 								  fonctionnement.
 									->Vérifier fusible de charge.
 
@@ -73,6 +68,7 @@ SI IL Y A UN PROBLÈME :
 
 
 
+						
 						
 SI IL Y A UN PROBLÈME GRAVE :
 
