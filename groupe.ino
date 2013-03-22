@@ -25,7 +25,8 @@
   08-02-2013    | bricofoy@free.fr      | 0.9.9 | suppression erreur temps maintenance + plein d'autres trucs
                 |                       |       | ajout test si ve_alim avant vérifier ubat pour éviter fausse erreur
                 |			|	| VERSION QUI FONCTIONNE !!
-  
+  22-03-2013	| bricofoy@free.fr	|	| Bug au démarrage ! La lecture entrée alim tombe et ça coupe --> en fait
+		|			|	| c'est la batterie qui baisse trop. Seuil de détection alim baissé à 3V.
   
   
   
@@ -206,7 +207,7 @@ float externe = 0;
   
   if (!force_entrees)
   {    
-    entrees = ve_alim * (ubat > 5);		//si ubat>5 alors l'expression vaut TRUE, ou  1
+    entrees = ve_alim * (ubat > 2);		//si ubat>5 alors l'expression vaut TRUE, ou  1
     if (externe > 11)
       entrees += ve_ext ;
     entrees += ve_prh * !digitalRead(e_prh);	// prh et run sont en logique inversée sur la carte
