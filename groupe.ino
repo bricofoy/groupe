@@ -8,7 +8,7 @@
   Démarrage sur commande à distance ou locale.
   Arrêt sur fin de commande à distance, coupure contact ou nouvelle commande locale.
   Arrêt avec alarme sur défaut pression huile. Redémarrage seulement si reset manuel.
-  Alarme si temps maintenance dépassé.
+  #Alarme si temps maintenance dépassé.
   Alarme si défaut de charge batterie de démarrage.
   
   
@@ -27,6 +27,8 @@
                 |			|	| VERSION QUI FONCTIONNE !!
   22-03-2013	| bricofoy@free.fr	|	| Bug au démarrage ! La lecture entrée alim tombe et ça coupe --> en fait
 		|			|	| c'est la batterie qui baisse trop. Seuil de détection alim baissé à 3V.
+  30-04-2013	| bricofoy@free.fr	| 1.0.0 | Ajout tempo de chauffage et refroidissement moteur + commande relais 
+		|			|	| coupure sortie commandé par s_dec
   
   
   
@@ -101,6 +103,8 @@
 #define et_decomp	9
 #define et_manuel	10
 #define et_force	11
+#define et_pre_run	12
+#define et_post_run	13
 
 //valeur du coef pont diviseur mesure ubat
 #define coef_ubat 	0.0205394
@@ -128,11 +132,13 @@
 #define tempo_pause_dem		15E3
 #define tempo_detection_calage  6E3
 #define tempo_coupe_alim	0.5E3
+#define tempo_pre_run		60E3	//tempo chauffage moteur avant activation sortie
+#define tempo_post_run		180E3	//tempo refroidissement avant coupure moteur
 
 #define max_cpt_calage		1	//nombre d'essais de redémarrage après calage
 #define max_cpt_dem		2	//nombre d'essais de démarrage
 
-#define tps_maintenance	30	//heures
+#define tps_maintenance		30	//heures
 
 
 //variables globales
@@ -831,7 +837,7 @@ void machine_etat() {
 	    }
 
 	    if (!(entrees & ve_alim )) {			//repasse en attente si coupure alim
-	      etat_machine = et_off;
+	      etat_machine = et_attente;
 	      tempoMS(0);
               tempoMS2(0);
 	      manuel = false;
@@ -962,6 +968,7 @@ void machine_etat() {
 		etat += vet_defph;				//passage immédiat en défaut si défaut pression huile
 	      sorties = vs_alim+vs_alarme;
 	      etat_machine = et_defaut;
+	      Serial.println("DEFAUT PRESSION HUILE !!!");
 	      flag = false;
 	      flagrun=false;
 	      flag2 = false;
@@ -1013,7 +1020,7 @@ void machine_etat() {
 	    break;
 
     case et_calage:   //***********************************************************************************************************************
-	    sorties = vs_alim+vs_alarme;
+	    sorties = vs_alim+vs_ok+vs_alarme;
 
 	    if (!(etat & vet_defcal))
 	      etat += vet_defcal;
