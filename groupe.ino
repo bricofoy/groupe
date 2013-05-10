@@ -1,4 +1,3 @@
-
 /****************************************************************************************
  * 		Gestion automatique de groupe électrogène.				*
  ****************************************************************************************
@@ -29,7 +28,10 @@
   22-03-2013	| bricofoy@free.fr	|	| Bug au démarrage ! La lecture entrée alim tombe et ça coupe --> en fait
 		|			|	| c'est la batterie qui baisse trop. Seuil de détection alim baissé à 3V.
   30-04-2013	| bricofoy@free.fr	| 1.0.0 | Ajout tempo de chauffage et refroidissement moteur + commande relais 
-		|			|	| coupure sortie commandé par s_dec
+		|			|	| coupure sortie commandé par s_out 
+  10-05-2013	|			|	| renommage s_dec --> s_out   vs_decmp --> vs_out
+		|			|	| TODO:supprimer l'état et_decomp
+		|			|	| ajout tempo sur détection défaut PrH pour éviter détection PrH au lieu de calage
   
   
   
@@ -42,17 +44,17 @@
 #define s_alim	13	//Maintien alim
 #define s_ev	12	//EV contact
 #define s_dem	10	//Demarreur
-#define s_pre	11	//Prechauffage
-#define s_dec	 9	//Decompresseur
+#define s_pre	11	//Préchauffage
+#define s_out	 9	//Relais de coupure sortie puissance
 #define s_alarme 7	//Témoin d'alerte
 #define s_ok	 8	//Témoin OK
 
 //valeurs des sorties
-#define vs_alim	   1	//format : alim|EV|demarreur|prechaufage|decompresseur|0|alerte|ok
+#define vs_alim	   1	//format : alim|EV|demarreur|prechaufage|sortie|0|alerte|ok
 #define vs_ev	   2
 #define vs_dem	   4
 #define vs_prech   8
-#define vs_decmp  16
+#define vs_out    16
 #define vs_alarme 64
 #define vs_ok	 128
 
@@ -125,16 +127,18 @@
 #define tempo_compteur		2E3
 #define tempo_manuel		18E5	//30 minutes
 #define tempo_valide_local	3E3
-#define tempo_valide_externe	5E3
+#define tempo_valide_externe	1E3
 #define tempo_valide_reset	5E3
 #define tempo_montre_reset	2E3
 #define tempo_montre_defaut	2E3
 #define tempo_reset_montre_def	2E3
 #define tempo_pause_dem		15E3
-#define tempo_detection_calage  6E3
+#define tempo_detection_calage  3E3
+#define tempo_detection_defph	0.5E3
 #define tempo_coupe_alim	0.5E3
 #define tempo_pre_run		60E3	//tempo chauffage moteur avant activation sortie
-#define tempo_post_run		180E3	//tempo refroidissement avant coupure moteur
+#define tempo_post_run		180E3	//tempo refroidissement après coupure sortie avant coupure moteur
+#define tempo_cligno		0.8E3
 
 #define max_cpt_calage		1	//nombre d'essais de redémarrage après calage
 #define max_cpt_dem		2	//nombre d'essais de démarrage
@@ -172,7 +176,7 @@ void setup() {
   pinMode(s_alarme,OUTPUT);
   pinMode(s_pre,   OUTPUT);
   pinMode(s_dem,   OUTPUT); 
-  pinMode(s_dec,   OUTPUT);
+  pinMode(s_out,   OUTPUT);
   pinMode(s_ok,    OUTPUT);
   pinMode(s_ev,    OUTPUT);
   
@@ -215,7 +219,7 @@ float externe = 0;
   if (!force_entrees)
   {    
     entrees = ve_alim * (ubat > 2);		//si ubat>5 alors l'expression vaut TRUE, ou  1
-    if (externe > 11)
+    if (externe > 10)
       entrees += ve_ext ;
     entrees += ve_prh * !digitalRead(e_prh);	// prh et run sont en logique inversée sur la carte
     entrees += ve_run * !digitalRead(e_run);
@@ -246,6 +250,7 @@ void ecriture_sorties() {
       delay(50);
       flagep = true;
       force_eeprom = false;
+      Serial.print("\nEcriture EEPROM faite\n");
     }
   }
   if ((sorties & vs_alim) && flagep)    //au cas où, mais normalement on ne rentrera jamais ici
@@ -255,7 +260,7 @@ void ecriture_sorties() {
   digitalWrite(s_ev,  	( sorties & vs_ev	));
   digitalWrite(s_dem, 	( sorties & vs_dem	));
   digitalWrite(s_pre, 	( sorties & vs_prech	));
-  digitalWrite(s_dec,  	( sorties & vs_decmp	));
+  digitalWrite(s_out,  	( sorties & vs_out	));
   digitalWrite(s_alarme,( sorties & vs_alarme	));
   digitalWrite(s_ok, 	( sorties & vs_ok	));
 }
@@ -377,13 +382,13 @@ void liaison_serie() {
 	}
 	
 	break;
-      case 'F' : 				//"Fxxx" Mode de forçage pour xxx secondes
+      case 'F' : 				//"Fxxx" Mode de forçage des sorties pour xxx secondes
 	etat_machine = et_force;
 	tempo_force = (unsigned long)valeur * 1E3;
 	tempoMS(0);
 	tempoMS2(0);
 	break;
-      case 'S' : 				//"Sxxx" force les sorties à xxx
+      case 'S' : 				//"Syyy" force les sorties à yyy, à utiliser avec Fxxx
 	sorties = valeur;
 	break;
       case 'V' : 				//"V" verbose
@@ -391,6 +396,8 @@ void liaison_serie() {
 	if(verbose) verbose = false;
 	else verbose = true;
 	break;
+      case '?' :
+	Serial.print("\nListe des commandes :\nR    reset tout\nr    reset tout sauf tps total\nexxx force valeur etat à xxx\nExxx force les entrées à xxx\nFxxxSyyy force les sorties à yyy pour xxx secondes\nW    force une écriture en eeprom\nt0xx force état machine à xx\nhxxx force la valeur de tps à xxx\nHxxx force la valeur de tpstot à xxx\nV ou v mode verbeux\n?    affiche ce message");
       default :
 	break;
     }
@@ -427,8 +434,8 @@ byte tempoMS(unsigned long duree) {
 		return false; }
   else 
     if (temps_courant > (temps_debut + duree)) {
-      tempo = false;					//remet à 0 le flag tempo si durée écoulée pour permettre le lancement suivant
-      return true;
+		tempo = false;				//remet à 0 le flag tempo si durée écoulée pour permettre le lancement suivant
+		return true;
     }
     else return false;
 }
@@ -437,14 +444,28 @@ byte tempoMS2(unsigned long duree) {
   static unsigned long temps_debut = 0;
   static boolean tempo = false;
   if (!duree) {	tempo = false;
+		return true; }
+  if (!tempo) {	tempo = true;
+		temps_debut = temps_courant;
+		return false; }
+  else 	if (temps_courant > (temps_debut + duree)) {
+		tempo = false;
+		return true; }
+	else return false;
+}
+
+byte tempoMS3(unsigned long duree) {
+  static unsigned long temps_debut = 0;
+  static boolean tempo = false;
+  if (!duree) {	tempo = false;
   return true; }
   if (!tempo) {	tempo = true;
   temps_debut = temps_courant;
   return false; }
   else 	if (temps_courant > (temps_debut + duree)) {
-	  tempo = false;
-	  return true; }
-	else return false;
+    tempo = false;
+    return true; }
+    else return false;
 }
 
 void incremente_tps() {
@@ -458,7 +479,7 @@ void incremente_tps() {
   }
 
   
-  if (temps_courant > (temps_precedent + tempo_compteur)) {	//stope le compteur si plus de tempo_compteur entre deux appels successifs
+  if (temps_courant > (temps_precedent + tempo_compteur)) {	//stoppe le compteur si plus de tempo_compteur entre deux appels successifs
     temps_precedent = 0;
     temps_debut = 0;
     return;
@@ -528,7 +549,7 @@ void machine_etat() {
 	      if ((etat & vet_defchg)||(etat & vet_tmax))
 		sorties = vs_alim+vs_alarme;			//si défaut de charge mémorisé, alarme
  
-	      if ((entrees & ve_alim)&&(ubat < min_ubat)) //on passe en défaut si ubat trop faible
+	      if ((entrees & ve_alim)&&(ubat < min_ubat)) 	//on passe en défaut si ubat trop faible
 	      {
 		etat_machine = et_defaut;
 		tempoMS(0);
@@ -540,10 +561,6 @@ void machine_etat() {
 	      else if (etat & vet_defubat)
 		etat -= vet_defubat;
 
-	      //if (tps >= tps_maintenance)
-		//if (!(etat & vet_tmax))
-		 // etat += vet_tmax;
-		
 
 	      if (tempoMS(tempo_attente))
 	      {							//coupe l'auto-maintien de l'alim si on dépasse la tempo de veille
@@ -586,7 +603,7 @@ void machine_etat() {
 	      flagext = true;
 	      tempoMS(0);
 	      if (tempoMS2(tempo_valide_externe))
-	      {					//passe au préchauffage si demande départ externe
+	      {							//passe au préchauffage si demande départ externe
 		etat_machine = et_prechauffe;
 		flagext=0;
 		tempoMS(0);
@@ -600,14 +617,7 @@ void machine_etat() {
 		flagext = 0;
 		tempoMS2(0);
 	      }
-	     /* //passe au préchauffage si demande départ externe
-	      etat_machine = et_prechauffe;
-	      
-	      tempoMS(0);
-	      tempoMS2(0);
-	      break;
-	    }
-*/
+
 
 	    if (entrees & ve_loc )
 	    {
@@ -657,27 +667,16 @@ void machine_etat() {
  	    }
 
 	    if (!(entrees & ve_alim))
-	    {/*
-	      flagalim = 1;
-	      if (tempoMS2(tempo_coupe_alim))
-	      {*/
-		etat_machine = et_off;			//repasse en attente si coupure alim
+	    {
+		etat_machine = et_off;				//coupure alim -> off
 		tempoMS(0);
-                tempoMS2(0);/*
-		flagalim = 0;
-	      }
+                tempoMS2(0);
 	    }
-	    else
-	      if (flagalim)
-	      {
-		tempoMS2(0);
-		flagalim = false;*/
-	      }
 	    
 	    break;
 
     case et_decomp:  //****************************************************************************************************************************************
-	    sorties = vs_alim+vs_ok+vs_prech+vs_ev+vs_dem+vs_decmp;
+	    sorties = vs_alim+vs_ok+vs_prech+vs_ev+vs_dem;
 
 	    if (!flag)
 	    { //flag sert à vérifier si on passe pour la première fois ou non dans la fonction
@@ -705,30 +704,20 @@ void machine_etat() {
               break;
 	    }
 
-// 	    if (!((entrees & ve_ext )||local))
-// 	    {							//repasse en attente si fin demande départ externe ou coupure alim
-// 	      etat_machine = et_attente;
-// 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
-// 	      flag = false;
-// 	    }
+ 	    if (!((entrees & ve_ext )||local))
+ 	    {							//repasse en attente si fin demande départ externe ou coupure alim
+ 	      etat_machine = et_attente;
+ 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
+	      flag = false;
+	    }
 
 	    if (!(entrees & ve_alim))
 	    {
-	     /* flagalim = 1;
-	      if (tempoMS2(tempo_coupe_alim))
-	      {*/
-		etat_machine = et_off;			//repasse en attente si coupure alim
+		etat_machine = et_off;				//coupure alim --> off
 		tempoMS(0);
                 tempoMS2(0);
-	        /*flagalim = 0;
-	      }
+		flag = false;
 	    }
-	    else
-		if (flagalim)
-		{
-		  tempoMS2(0);
-		  flagalim = false;*/
-		}
 	    
 
 	    break;
@@ -744,14 +733,13 @@ void machine_etat() {
 	    }
 		 
 	    if (entrees & ve_run)
-           // if (tempoMS2(500))
 	    {							//le moteur a démarré, passage à l'état suivant
 	      etat_machine = et_run;
 	      tempoMS(0);
               tempoMS2(0);
               break;
 	    }
-            //else tempoMS2(0);
+
 
 // 	    if (!((entrees & ve_ext )||local))
 // 	    {							//repasse en attente si fin demande départ externe
@@ -763,20 +751,9 @@ void machine_etat() {
 	    
 	    if (!(entrees & ve_alim))
 	    {
-	      //flagalim = 1;
-	      //if (tempoMS2(tempo_coupe_alim))
-	      //{
-		etat_machine = et_off;			//repasse en attente si coupure alim
+		etat_machine = et_off;			//repasse en off si coupure alim
 		tempoMS(0);
-		/*flagalim = 0;
-	      }
 	    }
-	    else
-	      if (flagalim)
-	      {
-		tempoMS2(0);
-		flagalim = false;*/
-	      }
 
 
 	    break;
@@ -794,7 +771,7 @@ void machine_etat() {
 		etat +=  vet_defubat;
 	    }
 
-	    if (!((entrees & ve_ext )||local)) {				//repasse en défaut si fin demande départ externe ou coupure alim avant démarrage réussi
+	    if (!((entrees & ve_ext )||local)) {				//repasse en défaut si fin demande départ externe avant démarrage réussi
 	      etat_machine = et_defaut;
 	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
 	    }
@@ -845,9 +822,47 @@ void machine_etat() {
 	    }
 	    break;
 	    
+    case et_pre_run:   //***************************************************************************************************************************************
+	    //sorties = vs_alim+vs_ev;
+	    
+	    incremente_tps();					//ici le moteur tourne -> on compte le temps de fonctionnement
+	    cpt_dem = 0;					//et remise à 0 du compteur d'essais de démarrages
+	    if (etat & vet_defdem)
+	      etat -= vet_defdem;				//et on supprime le flag défaut départ si il était présent
+	      
+	      
+	    if (tempoMS(tempo_pre_run))				//temps de chaufffage moteur écoulé, on passe en et_run
+	      etat_machine = et_run;
+	    
+	    if (tempoMS2(tempo_cligno))				//clignotement led OK pour signaler état
+	      if (sorties & vs_ok)
+		sorties -= vs_ok;
+	      else sorties += vs_ok;
+	      
+	      
+	    if (entrees & ve_prh)
+	      if (tempoMS3(tempo_detection_defph))
+	      {
+		if (!(etat & vet_defph))
+		  etat += vet_defph;				//passage en défaut si défaut pression huile
+		  sorties = vs_alim+vs_alarme;
+		etat_machine = et_defaut;
+		Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
+		flag = false;
+		flagrun=false;
+		flag2 = false;
+		local = false;
+		tempoMS2(0);
+		tempoMS(0);
+		break;
+	      }
+	      
+	      
+	    break;
+	      
 	    
     case et_run:  //********************************************************************************************************************************************
-	    sorties = vs_alim+vs_ok+vs_ev;
+	    sorties = vs_alim+vs_ok+vs_ev+vs_out;
 
 	    if (true)  //(!(flag||flag2)) //si on est en mode raz compteur temps, on zappe tout ce merdier
 	    {
@@ -879,14 +894,10 @@ void machine_etat() {
 		}
 
 
-
-
-
-
 	      if (!(entrees & ve_run))
 	      {
-		flagrun = true;//si calage du moteur en cours de fonctionnement
-		Serial.println("entrée dans detection calage");
+		flagrun = true;					//si calage du moteur en cours de fonctionnement
+		Serial.println("et_run : entrée dans detection calage\n");
 		if(tempoMS2(tempo_detection_calage))
 		  if (manuel)
 		  {
@@ -911,73 +922,58 @@ void machine_etat() {
                   }
                }   
 	      else
+	      {
 		if (flagrun)
 		{
 		  tempoMS2(0);
 		  flagrun = false;
-                  Serial.println("sortie detect calage");
+                  Serial.println("sortie detect calage\n");
 		}
+		if (entrees & ve_prh)
+		  if (tempoMS3(tempo_detection_defph))
+		  {
+		    if (!(etat & vet_defph))
+		      etat += vet_defph;				//passage en défaut si défaut pression huile
+		      sorties = vs_alim+vs_alarme;
+		    etat_machine = et_defaut;
+		    Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
+		    flag = false;
+		    flagrun=false;
+		    flag2 = false;
+		    local = false;
+		    tempoMS2(0);
+		    tempoMS(0);
+		    break;
+		  }
+	      }
 		
 
 
 	      if (!((entrees & ve_ext )||local))
 	      {
-		/*flagext = 1;
-		if (tempoMS2(tempo_detection_calage))
-		{*/
-		  etat_machine = et_off;			//repasse en attente si fin de demande départ externe
+		  etat_machine = et_post_run;			//fin de demande externe, passage au refroidissement
 		  tempoMS(0);
 		  tempoMS2(0);
 		  flagext = 0;
 		  break;
-		//}
 	      }
-	      /*else
-		if (flagext)
-		{
-		  tempoMS2(0);
-		  flagext = false;
-		}
-	      */
+
 	      if (!(entrees & ve_alim))
 	      {
-		/*flagalim = 1;
-		if (tempoMS2(tempo_coupe_alim))
-		{*/
-		  etat_machine = et_off;			//repasse en attente si coupure alim
+		  etat_machine = et_off;			//arret immediat si coupure alim
 		  tempoMS(0);
                   tempoMS2(0);
 		  local = false;
-		  flag = false;					//repasse en attente si coupure alim
+		  flag = false;
 		  flagalim = 0;
 		  break; 
-		//}
-	      }/*
-	      else
-		if (flagalim)
-		{
-		  tempoMS2(0);
-		  flagalim = false;
-		}*/
+	      }
 
 	    }
 	  
 	    
-	    if (entrees & ve_prh)
-	    {
-	      if (!(etat & vet_defph))
-		etat += vet_defph;				//passage immédiat en défaut si défaut pression huile
-	      sorties = vs_alim+vs_alarme;
-	      etat_machine = et_defaut;
-	      Serial.println("DEFAUT PRESSION HUILE !!!");
-	      flag = false;
-	      flagrun=false;
-	      flag2 = false;
-	      local = false;
-              tempoMS2(0);
-              tempoMS(0);
-	      break;
-	    }
+
+	    
 
 
 	   /* //effacement du compteur de maintenance
@@ -1019,6 +1015,40 @@ void machine_etat() {
 
   
 	    break;
+	    
+    case et_post_run: //***********************************************************************************************************************
+	    if (sorties & vs_out)
+	      sorties -= vs_out;
+	    
+	    if (tempoMS(tempo_post_run))
+	      etat_machine = et_off;
+	    
+	    if (tempoMS2(tempo_cligno/2))				//clignotement led OK pour signaler état
+	      if (sorties & vs_ok)
+		sorties -= vs_ok;
+	      else sorties += vs_ok;
+	      
+	   if (entrees & ve_prh)
+	      if (tempoMS3(tempo_detection_defph))
+	      {
+		if (!(etat & vet_defph))
+		  etat += vet_defph;				//passage en défaut si défaut pression huile
+		  sorties = vs_alim+vs_alarme;
+		etat_machine = et_defaut;
+		Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
+		flag = false;
+		flagrun=false;
+		flag2 = false;
+		local = false;
+		tempoMS2(0);
+		tempoMS(0);
+		break;
+	      }
+	      
+	      
+	    break;
+	      
+	      
 
     case et_calage:   //***********************************************************************************************************************
 	    sorties = vs_alim+vs_ok+vs_alarme;
