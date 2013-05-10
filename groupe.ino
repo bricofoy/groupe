@@ -44,8 +44,8 @@
 #define s_alim	13	//Maintien alim
 #define s_ev	12	//EV contact
 #define s_dem	10	//Demarreur
-#define s_pre	11	//Préchauffage
-#define s_out	 9	//Relais de coupure sortie puissance
+#define s_pre	 9	//Préchauffage
+#define s_out	11	//Relais de coupure sortie puissance
 #define s_alarme 7	//Témoin d'alerte
 #define s_ok	 8	//Témoin OK
 
@@ -117,7 +117,7 @@
 #define min_ubat_reset  12		//Tension au dessus de laquelle le défaut ubat disparait tout seul
 
 //temporisations, valeurs en ms
-#define tempo_attente		20E3	//20 sec
+#define tempo_attente		180E3	//3 min
 #define tempo_attente_defaut	7.2E6	//7,2*10^6ms = 2heures
 #define tempo_prechauffage	0.5E3	//1 secondes
 #define tempo_decomp		0.5E3	//0.5 s
@@ -269,7 +269,30 @@ void liaison_serie() {
   //écriture sur le port série
   unsigned int valeur=0;
   char commande=0;
-
+  static byte etat_machine_precedent=0;
+  
+  if (etat_machine != etat_machine_precedent)
+  {
+    Serial.print("etat : ");
+      switch (etat_machine) {
+	case et_attente : Serial.println("et-attente"); break;
+	case et_calage  : Serial.println("et_calage"); break;
+	case et_decomp  : Serial.println("et_decomp"); break;
+	case et_defaut  : Serial.println("et_defaut"); break;
+	case et_demarreur : Serial.println("et_demarreur"); break;
+	case et_force   : Serial.println("et_force"); break;
+	case et_manuel  : Serial.println("et_manuel"); break;
+	case et_off     : Serial.println("et_off"); break;
+	case et_pause_dem : Serial.println("et_pause_dem"); break;
+	case et_post_run : Serial.println("et_post_run"); break;
+	case et_pre_run : Serial.println("et_pre_run"); break;
+	case et_prechauffe : Serial.println("et_prechauffe"); break;
+	case et_run     : Serial.println("et_run"); break;
+	default : Serial.println("inconnu"); break;
+	}
+  }
+  
+  etat_machine_precedent = etat_machine;
   
   if(verbose)
   {
@@ -396,8 +419,15 @@ void liaison_serie() {
 	if(verbose) verbose = false;
 	else verbose = true;
 	break;
+      case 'p' :
+	Serial.print("Sorties = ");
+	Serial.println(sorties);
+	Serial.print("Entrees = ");
+	Serial.println(entrees);
+	
+	break;
       case '?' :
-	Serial.print("\nListe des commandes :\nR    reset tout\nr    reset tout sauf tps total\nexxx force valeur etat à xxx\nExxx force les entrées à xxx\nFxxxSyyy force les sorties à yyy pour xxx secondes\nW    force une écriture en eeprom\nt0xx force état machine à xx\nhxxx force la valeur de tps à xxx\nHxxx force la valeur de tpstot à xxx\nV ou v mode verbeux\n?    affiche ce message");
+	Serial.print("\nListe des commandes :\nR    reset tout\nr    reset tout sauf tps total\nexxx force valeur etat a xxx\nExxx force les entrees a xxx\nFxxxSyyy force les sorties a yyy pour xxx secondes\nW    force une ecriture en eeprom\nt0xx force etat machine a xx\nhxxx force la valeur de tps a xxx\nHxxx force la valeur de tpstot a xxx\nV ou v mode verbeux\n?    affiche ce message");
       default :
 	break;
     }
@@ -520,10 +550,10 @@ void machine_etat() {
     case et_force:
 	    if (tempoMS(tempo_force))
 	      etat_machine = et_attente;
-	    break;
+	    break;  //TODO : sauver état précédent et y revenir au lieu de et_attente
 	    
 	   
-    case et_attente: //***************************************************************************************************************************************
+    case et_attente: //*************************************************************************************************************
 	    sorties = vs_alim;
 
 	    if (!(flag||flag2))
@@ -565,6 +595,7 @@ void machine_etat() {
 	      if (tempoMS(tempo_attente))
 	      {							//coupe l'auto-maintien de l'alim si on dépasse la tempo de veille
 		etat_machine = et_off;
+		sorties = 0;
 		break;
 	      }
 
@@ -645,6 +676,7 @@ void machine_etat() {
 	    if (!(entrees & ve_alim ))
 	    {							//coupe l'auto-maintien de l'alim si l'alim locale est coupée
 	      etat_machine = et_off;
+	      sorties=0;
 	    }
 	    break;
       
@@ -675,16 +707,16 @@ void machine_etat() {
 	    
 	    break;
 
-    case et_decomp:  //****************************************************************************************************************************************
+    case et_decomp:  //***************************************************************************************************************
 	    sorties = vs_alim+vs_ok+vs_prech+vs_ev+vs_dem;
 
 	    if (!flag)
 	    { //flag sert à vérifier si on passe pour la première fois ou non dans la fonction
 	      flag=true;
 	      //s'execute au premier passage dans cet état uniquement
-	      if (etat & vet_defcal)				//si on essaye de redémarrer après un calage, on ne fait qu'un seul essai
-		cpt_dem += max_cpt_dem;				//donc on incrémente d'au moins max_cpt_dem ainsi ça ne passe la condition suivante que
-	      else cpt_dem++;					//si cpt_dem = 0 avant cette incrémentation.
+	      if (etat & vet_defcal)		//si on essaye de redémarrer après un calage, on ne fait qu'un seul essai
+		cpt_dem += max_cpt_dem;		//donc on incrémente d'au moins max_cpt_dem ainsi ça ne passe la condition suivante que
+	      else cpt_dem++;			//si cpt_dem = 0 avant cette incrémentation.
 	    }
 
 	    //s'exécute dans les passages suivants dans cet état
@@ -722,7 +754,7 @@ void machine_etat() {
 
 	    break;
 	
-    case et_demarreur: //**************************************************************************************************************************************
+    case et_demarreur: //*************************************************************************************************************
   	    sorties = vs_alim+vs_ok+vs_prech+vs_ev+vs_dem;
 
 	    if (tempoMS(tempo_demarreur))
@@ -734,7 +766,7 @@ void machine_etat() {
 		 
 	    if (entrees & ve_run)
 	    {							//le moteur a démarré, passage à l'état suivant
-	      etat_machine = et_run;
+	      etat_machine = et_pre_run;
 	      tempoMS(0);
               tempoMS2(0);
               break;
@@ -758,7 +790,7 @@ void machine_etat() {
 
 	    break;
 
-    case et_pause_dem:   //***********************************************************************************************************************************
+    case et_pause_dem:   //***********************************************************************************************************
 	    sorties = vs_alim+vs_alarme+vs_ok+vs_prech+vs_ev;
 	    
 	    if (tempoMS(tempo_pause_dem))
@@ -797,33 +829,45 @@ void machine_etat() {
 	      	    
 	    break;
 
-    case et_manuel:  //*****************************************************************************************************************************************
-	    sorties = vs_alim+vs_ev+vs_ok;
+    case et_manuel:  //****************************************************************************************************************
+      sorties = vs_alim+vs_ev+vs_ok;
+      if (flag2)
+	{
 	    manuel = true;
 
 	    if (tempoMS(tempo_manuel))
 	    {							//si pas de démarrage durant la tempo, on repasse en attente
 	      etat_machine = et_attente;
+	      flag2 = false;
 	      manuel = false;
 	    }
 
 	    if (entrees & ve_run) {				//le moteur a démarré, passage à l'état suivant
 	      etat_machine = et_run;
+	      flag2 = false;
 	      local = 1;
 	      tempoMS(0);
               tempoMS2(0);
 	    }
 
-	    if (!(entrees & ve_alim )) {			//repasse en attente si coupure alim
-	      etat_machine = et_attente;
+	    if (!(entrees & ve_alim )) {			//repasse en off si coupure alim
+	      etat_machine = et_off;
+	      flag2=false;
 	      tempoMS(0);
               tempoMS2(0);
 	      manuel = false;
 	    }
+	    
+	    if (entrees & ve_loc)				//si la clef est tournée on actionne le démarreur
+	      sorties += vs_dem;
+	}
+	else if(tempoMS(3E3))
+	  flag2 = true;
+		
 	    break;
 	    
-    case et_pre_run:   //***************************************************************************************************************************************
-	    //sorties = vs_alim+vs_ev;
+    case et_pre_run:   //*************************************************************************************************************
+	    sorties = vs_alim+vs_ev+vs_ok;
 	    
 	    incremente_tps();					//ici le moteur tourne -> on compte le temps de fonctionnement
 	    cpt_dem = 0;					//et remise à 0 du compteur d'essais de démarrages
@@ -835,9 +879,10 @@ void machine_etat() {
 	      etat_machine = et_run;
 	    
 	    if (tempoMS2(tempo_cligno))				//clignotement led OK pour signaler état
-	      if (sorties & vs_ok)
-		sorties -= vs_ok;
-	      else sorties += vs_ok;
+	      flag += 1;
+	    if (flag & 1)
+		sorties += vs_ok;
+	    else sorties -= vs_ok;
 	      
 	      
 	    if (entrees & ve_prh)
@@ -856,12 +901,31 @@ void machine_etat() {
 		tempoMS(0);
 		break;
 	      }
-	      
+	     
+	     if (!((entrees & ve_ext )||local))
+	     {
+	       etat_machine = et_off;			//fin de demande externe, off
+	       tempoMS(0);
+	       tempoMS2(0);
+	       flagext = 0;
+	       break;
+	     }
+	     
+	     if (!(entrees & ve_alim))
+	     {
+	       etat_machine = et_off;			//arret immediat si coupure alim
+	       tempoMS(0);
+	       tempoMS2(0);
+	       local = false;
+	       flag = false;
+	       flagalim = 0;
+	       break; 
+	     }
 	      
 	    break;
 	      
 	    
-    case et_run:  //********************************************************************************************************************************************
+    case et_run:  //******************************************************************************************************************
 	    sorties = vs_alim+vs_ok+vs_ev+vs_out;
 
 	    if (true)  //(!(flag||flag2)) //si on est en mode raz compteur temps, on zappe tout ce merdier
@@ -1016,17 +1080,17 @@ void machine_etat() {
   
 	    break;
 	    
-    case et_post_run: //***********************************************************************************************************************
-	    if (sorties & vs_out)
-	      sorties -= vs_out;
+    case et_post_run: //***************************************************************************************************************
+	    sorties = vs_alim+vs_ev+vs_ok;
 	    
 	    if (tempoMS(tempo_post_run))
 	      etat_machine = et_off;
 	    
-	    if (tempoMS2(tempo_cligno/2))				//clignotement led OK pour signaler état
-	      if (sorties & vs_ok)
-		sorties -= vs_ok;
-	      else sorties += vs_ok;
+	    if (tempoMS2(tempo_cligno/2))			//clignotement led OK pour signaler état
+	      flag += 1;
+	    if (flag & 1)
+	      sorties += vs_ok;
+	    else sorties -= vs_ok;
 	      
 	   if (entrees & ve_prh)
 	      if (tempoMS3(tempo_detection_defph))
@@ -1044,6 +1108,12 @@ void machine_etat() {
 		tempoMS(0);
 		break;
 	      }
+	      
+	    if (!(entrees & ve_alim))
+	      etat_machine = et_off;
+	    
+	    if (entrees & ve_ext)
+	      etat_machine = et_run;
 	      
 	      
 	    break;
