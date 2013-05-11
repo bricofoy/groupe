@@ -138,7 +138,7 @@
 #define tempo_coupe_alim	0.5E3
 #define tempo_pre_run		60E3	//tempo chauffage moteur avant activation sortie
 #define tempo_post_run		180E3	//tempo refroidissement après coupure sortie avant coupure moteur
-#define tempo_cligno		0.8E3
+#define tempo_cligno		0.6E3
 
 #define max_cpt_calage		1	//nombre d'essais de redémarrage après calage
 #define max_cpt_dem		2	//nombre d'essais de démarrage
@@ -497,6 +497,22 @@ byte tempoMS3(unsigned long duree) {
     return true; }
     else return false;
 }
+
+byte tempoMS4(unsigned long duree) {
+  static unsigned long temps_debut = 0;
+  static boolean tempo = false;
+  if (!duree) {	tempo = false;
+  return true; }
+  if (!tempo) {	tempo = true;
+  temps_debut = temps_courant;
+  return false; }
+  else 	if (temps_courant > (temps_debut + duree)) {
+    tempo = false;
+    return true; }
+    else return false;
+}
+
+
 
 void incremente_tps() {
   //compte les minutes et heures de fonctionnement tant que la fonction est appelée toutes les tempo_compteur millisecondes ou moins
@@ -869,6 +885,16 @@ void machine_etat() {
     case et_pre_run:   //*************************************************************************************************************
 	    sorties = vs_alim+vs_ev+vs_ok;
 	    
+	    
+	    if ((entrees & ve_alim)&&(ubat < min_chg))  //pour éviter défaut ubat lors de la coupure alim
+	    {							//si la batterie ne charge pas, allumage alarme
+	    sorties += vs_alarme;
+	    if (!(etat & vet_defchg))
+	      etat +=  vet_defchg;
+	    }
+	    else if (etat & vet_defchg)			//si la charge revient, on supprime le flag de défaut chg
+	      etat -= vet_defchg;
+	    
 	    incremente_tps();					//ici le moteur tourne -> on compte le temps de fonctionnement
 	    cpt_dem = 0;					//et remise à 0 du compteur d'essais de démarrages
 	    if (etat & vet_defdem)
@@ -881,10 +907,8 @@ void machine_etat() {
 	    if (tempoMS2(tempo_cligno))				//clignotement led OK pour signaler état
 	      flag += 1;
 	    if (flag & 1)
-		sorties += vs_ok;
-	    else sorties -= vs_ok;
-	      
-	      
+	      sorties -= vs_ok;
+	    	      
 	    if (entrees & ve_prh)
 	      if (tempoMS3(tempo_detection_defph))
 	      {
@@ -934,9 +958,9 @@ void machine_etat() {
 		//sorties = vs_alim+vs_ok+vs_ev+vs_alarme;
 
 
-	      if ((entrees&ve_alim)&&(ubat < min_chg))
+	      if ((entrees & ve_alim)&&(ubat < min_chg))
 	      {							//si la batterie ne charge pas, allumage alarme seule
-		sorties = vs_alim+vs_ev+vs_alarme;
+		sorties += vs_alarme;
 		if (!(etat & vet_defchg))
 		  etat +=  vet_defchg;
 	      }
@@ -1019,6 +1043,7 @@ void machine_etat() {
 		  tempoMS(0);
 		  tempoMS2(0);
 		  flagext = 0;
+		  flag = false;
 		  break;
 	      }
 
@@ -1086,26 +1111,23 @@ void machine_etat() {
 	    if (tempoMS(tempo_post_run))
 	      etat_machine = et_off;
 	    
-	    if (tempoMS2(tempo_cligno/2))			//clignotement led OK pour signaler état
+	    if (tempoMS2(tempo_cligno/2))				//clignotement led OK pour signaler état
 	      flag += 1;
 	    if (flag & 1)
-	      sorties += vs_ok;
-	    else sorties -= vs_ok;
-	      
+	      sorties -= vs_ok;
+	    
 	   if (entrees & ve_prh)
 	      if (tempoMS3(tempo_detection_defph))
 	      {
 		if (!(etat & vet_defph))
 		  etat += vet_defph;				//passage en défaut si défaut pression huile
-		  sorties = vs_alim+vs_alarme;
+		sorties = vs_alim+vs_alarme;
 		etat_machine = et_defaut;
 		Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
 		flag = false;
 		flagrun=false;
 		flag2 = false;
 		local = false;
-		tempoMS2(0);
-		tempoMS(0);
 		break;
 	      }
 	      
@@ -1113,14 +1135,21 @@ void machine_etat() {
 	      etat_machine = et_off;
 	    
 	    if (entrees & ve_ext)
-	      etat_machine = et_run;
-	      
+	    {
+	      if(tempoMS4(tempo_valide_externe))
+	      {
+		etat_machine = et_run;
+		tempoMS(0);
+		tempoMS2(0);
+	      }
+	    }
+	    else tempoMS4(0);
 	      
 	    break;
 	      
 	      
 
-    case et_calage:   //***********************************************************************************************************************
+    case et_calage:   //**************************************************************************************************************
 	    sorties = vs_alim+vs_ok+vs_alarme;
 
 	    if (!(etat & vet_defcal))
@@ -1136,10 +1165,10 @@ void machine_etat() {
 		 }
 	    break;
 	    
-    case et_defaut: //*************************************************************************************************************************
-	    sorties = vs_alim+vs_alarme;			//TODO sauver temps apparition défaut et si apparu durant run ou non
-								//TODO copier le principe utilisé dans et_run pour la RAZ défaut : raz tempo si
-								//la demande lâche avant validation
+    case et_defaut: //***************************************************************************************************************
+	    sorties = vs_alim+vs_alarme;		//TODO sauver temps apparition défaut et si apparu durant run ou non
+							//TODO copier le principe utilisé dans et_run pour la RAZ défaut : raz tempo si
+							//la demande lâche avant validation
 	    if(!flag)
 	    {
 	      if(etat == vet_ok )
