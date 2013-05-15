@@ -557,13 +557,15 @@ void machine_etat() {
 
 
   
-  switch (etat_machine) {
-    case et_off:
+  switch (etat_machine) 
+  {    
+    case et_off:  //*************************************************************************************************************
 	    sorties = 0;
             //if(entrees & ve_alim)
             //  etat_machine = et_attente;
 	    break;
-    case et_force:
+	    
+    case et_force:  //*************************************************************************************************************
 	    if (tempoMS(tempo_force))
 	      etat_machine = et_attente;
 	    break;  //TODO : sauver état précédent et y revenir au lieu de et_attente
@@ -605,7 +607,7 @@ void machine_etat() {
 		break;
 	      }
 	      else if (etat & vet_defubat)
-		etat -= vet_defubat;
+		      etat -= vet_defubat;
 
 
 	      if (tempoMS(tempo_attente))
@@ -812,16 +814,18 @@ void machine_etat() {
 	    if (tempoMS(tempo_pause_dem))
 	      etat_machine = et_decomp;
 
-	    if ((entrees & ve_alim)&&(ubat < min_ubat)) {
+	    if ((entrees & ve_alim)&&(ubat < min_ubat)) 
+	    {
 	      tempoMS(0);
 	      etat_machine = et_defaut;
 	      if (!(etat & vet_defubat))
 		etat +=  vet_defubat;
 	    }
 
-	    if (!((entrees & ve_ext )||local)) {				//repasse en défaut si fin demande départ externe avant démarrage réussi
+	    if (!((entrees & ve_ext )||local)) 		//repasse en défaut si fin demande départ externe avant démarrage réussi
+	    {	
 	      etat_machine = et_defaut;
-	      tempoMS(0);					//remise à zéro du timer pour utilisation ultérieure
+	      tempoMS(0);				//remise à zéro du timer pour utilisation ultérieure
 	    }
 
 	    if (!(entrees & ve_alim))
@@ -883,17 +887,17 @@ void machine_etat() {
 	    break;
 	    
     case et_pre_run:   //*************************************************************************************************************
-	    sorties = vs_alim+vs_ev+vs_ok;
+	sorties = vs_alim+vs_ev+vs_ok;
 	    
 	    
-	    if ((entrees & ve_alim)&&(ubat < min_chg))  //pour éviter défaut ubat lors de la coupure alim
+	    if ((entrees & ve_alim)&&(ubat < min_chg))  	//pour éviter défaut ubat lors de la coupure alim
 	    {							//si la batterie ne charge pas, allumage alarme
-	    sorties += vs_alarme;
-	    if (!(etat & vet_defchg))
-	      etat +=  vet_defchg;
+	      sorties += vs_alarme;
+	      if (!(etat & vet_defchg))
+		etat +=  vet_defchg;
 	    }
-	    else if (etat & vet_defchg)			//si la charge revient, on supprime le flag de défaut chg
-	      etat -= vet_defchg;
+	    else if (etat & vet_defchg)				//si la charge revient, on supprime le flag de défaut chg
+		    etat -= vet_defchg;
 	    
 	    incremente_tps();					//ici le moteur tourne -> on compte le temps de fonctionnement
 	    cpt_dem = 0;					//et remise à 0 du compteur d'essais de démarrages
@@ -906,6 +910,7 @@ void machine_etat() {
 	    
 	    if (tempoMS2(tempo_cligno))				//clignotement led OK pour signaler état
 	      flag += 1;
+	    
 	    if (flag & 1)
 	      sorties -= vs_ok;
 	    	      
@@ -914,7 +919,8 @@ void machine_etat() {
 	      {
 		if (!(etat & vet_defph))
 		  etat += vet_defph;				//passage en défaut si défaut pression huile
-		  sorties = vs_alim+vs_alarme;
+		  
+		sorties = vs_alim+vs_alarme;
 		etat_machine = et_defaut;
 		Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
 		flag = false;
@@ -1021,8 +1027,8 @@ void machine_etat() {
 		  if (tempoMS3(tempo_detection_defph))
 		  {
 		    if (!(etat & vet_defph))
-		      etat += vet_defph;				//passage en défaut si défaut pression huile
-		      sorties = vs_alim+vs_alarme;
+		      etat += vet_defph;			//passage en défaut si défaut pression huile
+		    sorties = vs_alim+vs_alarme;
 		    etat_machine = et_defaut;
 		    Serial.println("\n\nDEFAUT PRESSION HUILE !!!\n\n");
 		    flag = false;
@@ -1111,7 +1117,7 @@ void machine_etat() {
 	    if (tempoMS(tempo_post_run))
 	      etat_machine = et_off;
 	    
-	    if (tempoMS2(tempo_cligno/2))				//clignotement led OK pour signaler état
+	    if (tempoMS2(tempo_cligno/2))			//clignotement led OK pour signaler état
 	      flag += 1;
 	    if (flag & 1)
 	      sorties -= vs_ok;
@@ -1172,7 +1178,7 @@ void machine_etat() {
 	    if(!flag)
 	    {
 	      if(etat == vet_ok )
-	      {							//en cas d'entrée en défaut par erreur
+	      {						//en cas d'entrée en défaut par erreur
 		etat_machine = et_attente;
 		break;
 	      }
@@ -1268,7 +1274,7 @@ void machine_etat() {
 	    
 	    
       default:  //*************************************************************************************************************************
-	    etat_machine = et_defaut;					//si erreur interne
+	    etat_machine = et_defaut;				//si erreur interne
       
   }
 }
