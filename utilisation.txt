@@ -8,13 +8,19 @@ FONCTIONNEMENT AUTOMATIQUE :
     en veille pour économiser la batterie.
 
     Si il y a une demande de démarrage externe (commande par l'onduleur), le voyant blanc, puis le vert
-    s'allument, et le groupe démarre au bout de 5 secondes d'attente.
+    s'allument, et le groupe démarre au bout de 2 secondes d'attente.
+    Le moteur tourne ensuite pendant 1 minute à vide avant que la sortie de courant ne soit activée, afin 
+    de permettre une montée en température de la mécanique avant de la solliciter. Durant cette phase de 
+    chauffage, la diode verte clignote.
 
-    À la fin de la demande externe, le groupe s’arrête, le voyant blanc reste allumé en attente 20 secondes,
+    À la fin de la demande externe, la sortie de courant est désactivée, et le moteur tourne encore 
+    pendant 3 minutes pour permettre son refroidissement. Durant cette phase de refroidissement, la 
+    diode verte clignote rapidement.
+    A l'issue de ces 3 minutes, le groupe s’arrête, le voyant blanc reste allumé en attente 20 secondes,
     puis le système passe en veille pour économiser la batterie.
 
-    Si il y a un défaut enregistré, le voyant rouge est allumé et le système reste en attente 2h pour
-    signaler le défaut.
+    Si il y a un défaut enregistré, le moteur se coupe et le voyant rouge est allumé. Le système reste
+    en attente 2h pour signaler le défaut.
 
 
 
@@ -33,9 +39,12 @@ DEMANDER LE DÉMARRAGE MANUELLEMENT :
     Pour demander le démarrage du groupe, tourner la clef sur "start" pendant 3s. Le voyant vert s'allume,
     le groupe démarre.
     Dès l'allumage du voyant vert, la demande est enregistrée, on peux relâcher la clef.
+    Le moteur tourne ensuite pendant 1 minute avant activation de la sortie de courant pour permettre sa montée 
+    en température. Durant cette phase de chauffage, la diode verte clignote.
     
     Pour arrêter le groupe après un démarrage manuel, tourner la clef sur "off". Penser le cas échéant
     à la remettre ensuite sur "on" pour revenir au mode automatique.
+    
 
 
 
@@ -52,7 +61,7 @@ SI IL Y A UN PROBLÈME :
 								  fonctionnement.
 									->Vérifier fusible de charge.
 
-								  Ces deux défauts n'empêchent pas le
+								  Ce défaut n'empêche pas le
 								  fonctionnement normal du système.	
 
 						Si rien ne se passe après appui de 2 secondes, c'est que le
@@ -105,7 +114,7 @@ DÉMARRAGE MANUEL :
     
     Pour démarrer le moteur avec le lanceur manuel, il faut activer le mode manuel.
 
-    Pour cela, appuyer sur "reset", puis immédiatement tourner la clef sur "start".
+    Pour cela, appuyer sur "reset", puis immédiatement après tourner la clef sur "start".
 					->	La diode verte s'allume. Si la rouge était allumée, elle le
 						reste.
 
@@ -122,13 +131,13 @@ DÉMARRAGE MANUEL :
 							Sinon vérifier le niveau de gasoil et le blocage du
 							levier du régulateur, puis reprendre en 1.
 
-    Pour arrêter ensuite le moteur, tourner le clef sur "off".
+    Pour arrêter ensuite le moteur, tourner la clef sur "off".
 
 
 ARRÊT D'URGENCE DU MOTEUR :
 
     En cas de défaillance de l’arrêt électrique ( si clef sur "off" le moteur tourne toujours), appuyer sur le
-    levier de déblocage du régulateur. Débrancher la batterie et contacter le fournisseur.
+    levier de déblocage du régulateur. Si le problème se reproduit, contacter le fournisseur.
 
       
     
